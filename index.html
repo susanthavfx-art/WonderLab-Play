@@ -88,6 +88,7 @@
         </span>
         <span class="owner-actions">
           <button class="btn btn--ghost btn--sm" type="button" id="syncNowBtn" title="Refresh from Supabase cloud">↻ Sync</button>
+          <button class="btn btn--ghost btn--sm" type="button" id="openChangePwBtn" title="Change Owner Password">🔑 Password</button>
           <button class="btn btn--primary btn--sm" type="button" data-open-add>
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
             Add New Game
@@ -384,7 +385,33 @@
         </label>
         <button class="btn btn--primary btn--full" type="submit">Unlock owner mode</button>
       </form>
-      <p class="modal-note">Tip: the default password is <code>wonderlab2026</code> — change it inside <code>js/app.js</code>.</p>
+    </div>
+  </div>
+
+  <!-- ===================== Change owner password modal ===================== -->
+  <div class="modal" id="changePwModal" role="dialog" aria-modal="true" aria-labelledby="changePwTitle" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card modal-card--sm">
+      <button class="modal-close" type="button" data-close aria-label="Close">✕</button>
+      <div class="modal-icon">🔑</div>
+      <h2 id="changePwTitle">Change Owner Password</h2>
+      <p class="modal-sub">Encrypted &amp; saved securely in Supabase Cloud. Only you know this password.</p>
+      <form id="changePwForm" novalidate>
+        <label class="field">
+          <span class="field-label">Current password</span>
+          <input id="currentOwnerPw" type="password" placeholder="Enter current password" autocomplete="current-password" required />
+        </label>
+        <label class="field">
+          <span class="field-label">New password (min 6 chars)</span>
+          <input id="newOwnerPw" type="password" placeholder="Enter new secret password" autocomplete="new-password" minlength="6" required />
+        </label>
+        <label class="field">
+          <span class="field-label">Confirm new password</span>
+          <input id="confirmOwnerPw" type="password" placeholder="Re-enter new password" autocomplete="new-password" minlength="6" required />
+          <span class="field-error" id="changePwError"></span>
+        </label>
+        <button class="btn btn--primary btn--full" type="submit">Save New Password</button>
+      </form>
     </div>
   </div>
 

@@ -39,7 +39,7 @@ One magical arcade for every **WonderLab AR** game & app — built with pure **H
 ## 🔐 Owner Mode
 
 1. Click **🔒 Owner** in the top-right header.
-2. Enter password: `wonderlab2026`
+2. Enter your private Owner password (stored encrypted via bcrypt in Supabase `portal_private` — zero secrets in source code; changeable anytime via **🔑 Password** inside Owner mode).
 3. Click **Add New Game** (or **✏️** on any card) to set:
    - **Play link:** your game's GitHub Pages URL (e.g. `https://susanthavfx-art.github.io/3D-Digital-Aquarium/`)
    - **Launch mode:** *Inside Portal Player*, *Full Screen Direct*, or *New Tab*

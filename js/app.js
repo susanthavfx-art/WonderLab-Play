@@ -22,14 +22,12 @@
    --------------------------------------------------------- */
 
 const CONFIG = {
-  // Owner password is "wonderlab2026" (verified via Supabase RPC + local hash fallback)
-  ownerToken: '2f9d04b4', // djb2("wl$" + password)
+  // Owner authentication is verified strictly server-side via Supabase RPC (zero client secrets)
   storageKey: 'wonderlab.games.v2',
   sessionKey: 'wonderlab.owner.v1',
   sessionPwKey: 'wonderlab.owner.pw.v1',
   tvModeKey: 'wonderlab.tv.v1',
   bestKey: 'wonderlab.arcade.best.v1',
-  adminPasswordHint: 'wonderlab2026',
 
   // Supabase Cloud Sync (wonderlab.app project — public anon key + RLS)
   supabaseUrl: 'https://zptfctcsjauobncvenne.supabase.co',
@@ -49,6 +47,22 @@ const CATEGORIES = [
 
 const SEED_GAMES = [
   {
+    id: 'wonderfish-3d',
+    title: 'WonderFish 3D Aquarium',
+    desc: 'Color a fish on paper, scan with your phone & watch it swim live in 3D on your TV, laptop or phone!',
+    category: 'web-ar',
+    cover: 'https://susanthavfx-art.github.io/WonderFish/assets/clay/hero-family-reef.jpg',
+    link: 'https://susanthavfx-art.github.io/WonderFish/tank-new.html',
+    phoneUrl: 'https://susanthavfx-art.github.io/WonderFish/scan.html',
+    launchMode: 'fullscreen',
+    devices: ['phone', 'laptop', 'tv'],
+    badge: 'Featured',
+    emoji: '🐠',
+    players: '6 Fish Free',
+    time: 'Live 3D',
+    createdAt: 1795465000000
+  },
+  {
     id: 'immersive-workout',
     title: 'Immersive Workout',
     desc: 'Jump, squat and stretch with your camera — your living room becomes a magic gym!',
@@ -58,7 +72,7 @@ const SEED_GAMES = [
     phoneUrl: '',
     launchMode: 'modal',
     devices: ['phone', 'laptop'],
-    badge: 'Featured',
+    badge: 'Hot',
     emoji: '⚡',
     players: '1 Player',
     time: '10 mins',
@@ -373,22 +387,43 @@ const cloud = {
     return false;
   },
   async verifyPassword(pass) {
-    if (!this.enabled()) return tryLogin(pass);
+    if (!this.enabled() || !pass || pass.length < 4) return false;
     try {
       const res = await this.fetchWithTimeout(
         CONFIG.supabaseUrl + '/rest/v1/rpc/portal_verify_owner',
         { method: 'POST', headers: this.headers(), body: JSON.stringify({ p_pass: pass }) },
-        5500
+        6000
       );
-      if (!res.ok) return tryLogin(pass);
+      if (!res.ok) return false;
       const ok = await res.json();
       return Boolean(ok);
     } catch (e) {
-      return tryLogin(pass);
+      return false;
+    }
+  },
+  async changePassword(currentPass, newPass) {
+    if (!this.enabled()) return { ok: false, error: 'Cloud connection unavailable.' };
+    try {
+      const res = await this.fetchWithTimeout(
+        CONFIG.supabaseUrl + '/rest/v1/rpc/portal_change_owner_password',
+        {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({ p_current_pass: currentPass, p_new_pass: newPass })
+        },
+        7000
+      );
+      const data = await res.json().catch(function () { return null; });
+      if (!res.ok) {
+        return { ok: false, error: (data && data.message) || 'Current password is incorrect.' };
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: 'Network error. Please check internet & try again.' };
     }
   },
   async upsertGame(game) {
-    const pw = store.ownerPassword() || CONFIG.adminPasswordHint;
+    const pw = store.ownerPassword();
     if (!this.enabled() || !pw) return { ok: false, offline: true };
     try {
       const res = await this.fetchWithTimeout(
@@ -409,7 +444,7 @@ const cloud = {
     }
   },
   async deleteGame(id) {
-    const pw = store.ownerPassword() || CONFIG.adminPasswordHint;
+    const pw = store.ownerPassword();
     if (!this.enabled() || !pw) return { ok: false, offline: true };
     try {
       const res = await this.fetchWithTimeout(
@@ -911,10 +946,6 @@ document.addEventListener('keydown', function (e) {
 /* ---------------------------------------------------------
    7. OWNER MODE + SUPABASE WRITE SYNC
    --------------------------------------------------------- */
-
-function tryLogin(password) {
-  return djb2('wl$' + password) === CONFIG.ownerToken;
-}
 
 function openAdminLogin() {
   $('#adminForm').reset();
@@ -2044,7 +2075,52 @@ function setupEvents() {
   });
   $('#logoutBtn').addEventListener('click', logoutOwner);
 
-  // Admin login form (verifies with Supabase RPC + local hash fallback)
+  const openChangePwBtn = $('#openChangePwBtn');
+  if (openChangePwBtn) {
+    openChangePwBtn.addEventListener('click', function () {
+      if (!store.isOwner()) return;
+      $('#changePwForm').reset();
+      $('#changePwError').textContent = '';
+      openModal('changePwModal');
+    });
+  }
+
+  const changePwForm = $('#changePwForm');
+  if (changePwForm) {
+    changePwForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const cur = $('#currentOwnerPw').value;
+      const nw = $('#newOwnerPw').value.trim();
+      const cf = $('#confirmOwnerPw').value.trim();
+      const errEl = $('#changePwError');
+      errEl.textContent = '';
+
+      if (nw.length < 6) {
+        errEl.textContent = 'New password must be at least 6 characters.';
+        return;
+      }
+      if (nw !== cf) {
+        errEl.textContent = 'New passwords do not match.';
+        return;
+      }
+
+      const btn = changePwForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      const res = await cloud.changePassword(cur, nw);
+      btn.disabled = false;
+
+      if (!res.ok) {
+        errEl.textContent = res.error || 'Could not update password.';
+        return;
+      }
+
+      store.setOwner(true, nw);
+      closeModal('changePwModal');
+      toast('Owner password updated securely in Cloud!', 'success');
+    });
+  }
+
+  // Admin login form (verified strictly via Supabase RPC)
   $('#adminForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const pass = $('#adminPassword').value;
@@ -2171,7 +2247,16 @@ function init() {
   $('#year').textContent = String(new Date().getFullYear());
 
   if (store.isOwner()) {
-    toast('Welcome back, owner. Owner mode is active.', 'info');
+    const savedPw = store.ownerPassword();
+    cloud.verifyPassword(savedPw).then(function (ok) {
+      if (!ok) {
+        store.setOwner(false);
+        applyOwnerVisibility();
+        renderGrid();
+      } else {
+        toast('Welcome back, owner. Owner mode is active.', 'info');
+      }
+    });
   }
 
   // Live Supabase Cloud Sync on startup, then handle any #game= deep link
